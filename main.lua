@@ -11,6 +11,7 @@ local vy
 local speed = 10      -- left, right
 local gravity = 40    -- down
 local jumppower = -15 -- suddenly up
+local pound = 30
 local grip = 0.2
 local midair = true
 local doublejump = false
@@ -20,10 +21,9 @@ local motanh          -- height
 local motanw          -- width
 -- motan controls
 local left
-
--- fun stuff
-local lastsec
-local sec
+local down
+local up
+local right
 
 -- control images
 local leftimg
@@ -35,10 +35,28 @@ local downdraw
 local updraw
 local rightdraw
 
+-- level stuff
+local level = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,0,
+               0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,
+               0,1,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,0,
+               2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
+local counter
+
 function love.load()  -- load assets
   love.graphics.setDefaultFilter('nearest','nearest')
 
-  motan = love.graphics.newImage('graphics/motan.png')
+  motan = love.graphics.newImage('graphics/jej.png')
   leftimg = love.graphics.newImage('graphics/left.png')
   downimg = love.graphics.newImage('graphics/down.png')
   upimg = love.graphics.newImage('graphics/up.png')
@@ -47,27 +65,36 @@ function love.load()  -- load assets
   motanh = motan:getHeight()
   motanw = motan:getWidth()
   love.window.setMode(xres,yres,{})
-  x = xres/2-motanw/2 -- center player
-  y = yres/2-motanh/2
   vx = 0
   vy = 0
-
-  sec = love.timer.getTime()
+  for i=0,15 do
+    for j=1,19 do
+      if level[j+i*20] == 1 then
+        x = j*32
+        y = i*32
+      end
+    end
+  end
 end
 
 function love.update(dt)
   vy = vy+gravity*dt  -- apply gravity
-
-  if left then
+  
+  if left and not right then
     vx = math.max(-speed,vx-speed*grip)
-  elseif right then
+  elseif right and not left then
     vx = math.min(speed,vx+speed*grip)
+  end
+
+  if up and not midair then
+    vy = jumppower
+    doublejump = true
   end
 
   y = y+vy
   y = math.min(y,yres-motanh)
   x = x+vx
-  x = x % xres
+  x = x%xres
 
   if y == yres-motanh then
     midair = false
@@ -78,20 +105,30 @@ function love.update(dt)
 end
 
 function love.draw()
+  counter = 1
+  for i=0,15 do
+    for j=0,19 do
+      if level[1+j+i*20] == 2 then
+        love.graphics.draw(motan,j*32,i*32)
+      end
+    end
+  end
+
   love.graphics.draw(motan,math.floor(x+0.5),math.floor(y+0.5))
 
   if leftdraw then
-    love.graphics.draw(leftimg,0,16)
+    love.graphics.draw(leftimg,x-16+motanw/4,y-40)
   end
   if downdraw then
-    love.graphics.draw(downimg,16,16)
+    love.graphics.draw(downimg,x+motanw/4,y-24)
   end
   if updraw then
-    love.graphics.draw(upimg,16,0)
+    love.graphics.draw(upimg,x+motanw/4,y-56)
   end
   if rightdraw then
-    love.graphics.draw(rightimg,32,16)
+    love.graphics.draw(rightimg,x+16+motanw/4,y-40)
   end
+
 end
 
 function love.keypressed(key, unused, isrepeat)
@@ -104,19 +141,16 @@ function love.keypressed(key, unused, isrepeat)
     rightdraw = true
   end
   if key == "up" then
+    up = true
     updraw = true
-    if not isrepeat then
-      if not midair then      -- 1st jump from the ground
-        vy = jumppower
-        doublejump = true
-      elseif doublejump then  -- 2nd jump in the air
-        vy = jumppower
-        doublejump = false
-      end
+    if doublejump and not isrepeat then
+      vy = jumppower
+      doublejump = false
     end
   end
   if key == "down" then
     downdraw = true
+    vy = pound
   end
 end
 
@@ -130,6 +164,7 @@ function love.keyreleased(key)
     rightdraw = false
   end
   if key == "up" then
+    up = false
     updraw = false
   end
   if key == "down" then
