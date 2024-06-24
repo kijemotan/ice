@@ -1,18 +1,21 @@
 -- game stuff
 local xres = 640
 local yres = 480
+local font
+local info
 
 -- motan position
 local x               -- -left +right
-local vx
 local y               -- -up +down
-local vy
--- motan movement
+-- motan movement constants
 local speed = 10      -- left, right
 local gravity = 40    -- down
 local jumppower = -15 -- suddenly up
 local pound = 30
 local grip = 0.2
+-- motan movement variables
+local vx
+local vy
 local midair = true
 local doublejump = false
 -- motan media
@@ -51,7 +54,6 @@ local level = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                0,0,0,0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,
                0,1,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,0,
                2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-local counter
 
 function love.load()  -- load assets
   love.graphics.setDefaultFilter('nearest','nearest')
@@ -75,10 +77,15 @@ function love.load()  -- load assets
       end
     end
   end
+
+  font = love.graphics.newFont("fg.ttf", 12) 
+  info = love.graphics.newText(font)
 end
 
 function love.update(dt)
-  vy = vy+gravity*dt  -- apply gravity
+  if midair then
+    vy = vy+gravity*dt  -- apply gravity
+  end
   
   if left and not right then
     vx = math.max(-speed,vx-speed*grip)
@@ -91,6 +98,7 @@ function love.update(dt)
     doublejump = true
   end
 
+  --[[
   y = y+vy
   y = math.min(y,yres-motanh)
   x = x+vx
@@ -102,11 +110,60 @@ function love.update(dt)
   else
     midair = true
   end
+  ]]--
+
+  x = math.floor(x+0.5)
+  vx = math.floor(vx+0.5)
+  y = math.floor(y+0.5)
+  vy = math.floor(vy+0.5)
+
+  for i=0,14 do
+    for j=0,19 do
+      if level[1+j+i*20] <= 2 then
+
+        if vx > 0 then  -- going right
+          if x > j*32 and y > i*32 and y < i*32+32 then
+            x = x-(x-j*32)
+            vx = 0
+          end
+        elseif vx < 0 then  -- going left
+          if x < j*32+32 and y > i*32 and y < i*32+32 then
+            x = x+(j*32+32-x)
+            vx = 0
+          end
+        end
+
+        if vy > 0 then  -- going down
+          if y > i*32 and x > j*32 and x < j*32+32 then
+            y = y-(y-i*32)
+            vy = 0
+            midair = false
+            doublejump = true
+          end
+        elseif vy < 0 then  -- going up
+          if y < i*32+32 and x > j*32 and x < j*32+32 then
+            y = y+(i*32+32-y)
+            vy = 0
+          end
+        end
+
+      end
+    end
+  end
+
+  y = y+vy
+  x = x+vx
+  x = x%xres  -- loop horizontally
+
+  if vy ~= 0 then
+    midair = true
+  end
+
+
 end
 
 function love.draw()
-  counter = 1
-  for i=0,15 do
+  for i=0,14 do
     for j=0,19 do
       if level[1+j+i*20] == 2 then
         love.graphics.draw(motan,j*32,i*32)
@@ -129,6 +186,15 @@ function love.draw()
     love.graphics.draw(rightimg,x+16+motanw/4,y-40)
   end
 
+  info:set({"         x: "..x..
+          "\n         y: "..y..
+          "\n        vx: "..vx..
+          "\n        vy: "..vy..
+          "\n    midair: "..tostring(midair)..
+          "\ndoublejump: "..tostring(doublejump)
+          ,{1,1,1}
+           })
+  love.graphics.draw(info,0,0)
 end
 
 function love.keypressed(key, unused, isrepeat)
