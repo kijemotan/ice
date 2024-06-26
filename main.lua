@@ -5,8 +5,12 @@ local font
 local info
 
 -- motan position
-local x               -- -left +right
-local y               -- -up +down
+local x               -- left edge
+local x2              -- right edge
+local y               -- upper edge
+local y2              -- lower edge
+local sx              -- spawn pos
+local sy
 -- motan movement constants
 local speed = 10      -- left, right
 local gravity = 40    -- down
@@ -14,10 +18,12 @@ local jumppower = -15 -- suddenly up
 local pound = 30
 local grip = 0.2
 -- motan movement variables
-local vx
-local vy
+local vx = 0
+local vy = 0
 local midair = true
 local doublejump = false
+local collidedv
+local collidedh
 -- motan media
 local motan           -- sprite
 local motanh          -- height
@@ -58,6 +64,8 @@ local level = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 function love.load()  -- load assets
   love.graphics.setDefaultFilter('nearest','nearest')
 
+  tile = love.graphics.newImage('graphics/tile.png')
+  spawn = love.graphics.newImage('graphics/spawn.png')
   motan = love.graphics.newImage('graphics/jej.png')
   leftimg = love.graphics.newImage('graphics/left.png')
   downimg = love.graphics.newImage('graphics/down.png')
@@ -67,13 +75,13 @@ function love.load()  -- load assets
   motanh = motan:getHeight()
   motanw = motan:getWidth()
   love.window.setMode(xres,yres,{})
-  vx = 0
-  vy = 0
   for i=0,15 do
     for j=1,19 do
       if level[j+i*20] == 1 then
         x = j*32
         y = i*32
+        sx = x
+        sy = y
       end
     end
   end
@@ -83,6 +91,11 @@ function love.load()  -- load assets
 end
 
 function love.update(dt)
+  --print("--------------------")
+
+  x2 = x + motanw
+  y2 = y + motanh
+
   if midair then
     vy = vy+gravity*dt  -- apply gravity
   end
@@ -94,6 +107,7 @@ function love.update(dt)
   end
 
   if up and not midair then
+    y = y-1
     vy = jumppower
     doublejump = true
   end
@@ -112,53 +126,76 @@ function love.update(dt)
   end
   ]]--
 
-  x = math.floor(x+0.5)
-  vx = math.floor(vx+0.5)
-  y = math.floor(y+0.5)
-  vy = math.floor(vy+0.5)
+  x = x+vx
+  x = x%xres
 
+  if y >= 1000 then
+    x = sx
+    y = sy
+    print("respawned!")
+  end
+  
+  collided = false
+  
+  -- check for horizontal collision
   for i=0,14 do
+    ty = i*32   -- tile upper edge
+    ty2 = ty+32 -- tile lower edge
     for j=0,19 do
-      if level[1+j+i*20] <= 2 then
+      tx = j*32   -- tile left edge
+      tx2 = tx+32 -- tile right edge
 
-        if vx > 0 then  -- going right
-          if x > j*32 and y > i*32 and y < i*32+32 then
-            x = x-(x-j*32)
+      if level[1+j+i*20] >= 2 then
+        if x2 > tx and x <= tx2 and y2 > ty and y <= ty2 then
+          collidedh = true
+          if vx > 0 then  -- going right
+            x = tx-32
             vx = 0
-          end
-        elseif vx < 0 then  -- going left
-          if x < j*32+32 and y > i*32 and y < i*32+32 then
-            x = x+(j*32+32-x)
+          elseif vx < 0 then  -- going left
+            x = tx2
             vx = 0
           end
         end
-
-        if vy > 0 then  -- going down
-          if y > i*32 and x > j*32 and x < j*32+32 then
-            y = y-(y-i*32)
-            vy = 0
-            midair = false
-            doublejump = true
-          end
-        elseif vy < 0 then  -- going up
-          if y < i*32+32 and x > j*32 and x < j*32+32 then
-            y = y+(i*32+32-y)
-            vy = 0
-          end
-        end
-
       end
     end
   end
 
   y = y+vy
-  x = x+vx
-  x = x%xres  -- loop horizontally
 
+  -- check for vertical collision
+  for i=0,14 do
+    ty = i*32   -- tile upper edge
+    ty2 = ty+32 -- tile lower edge
+    for j=0,19 do
+      tx = j*32   -- tile left edge
+      tx2 = tx+32 -- tile right edge
+
+      if level[1+j+i*20] >= 2 then
+        if x2 >= tx and x <= tx2 and y2 >= ty and y <= ty2 then
+          collidedv = true
+          if vy < 0 then  -- going up
+            y = ty2
+            vy = 0
+          else  -- going down or not moving vertically
+            y = ty-32
+            vy = 0
+            midair = false
+            doublejump = true
+          end
+        end
+      end
+    end
+  end
+  
+  --print("vy: "..vy)
   if vy ~= 0 then
     midair = true
   end
-
+  if not collided then
+    midair = true
+  end
+  --print("collided: "..tostring(collided))
+  --print("midair: "..tostring(midair))
 
 end
 
@@ -166,7 +203,9 @@ function love.draw()
   for i=0,14 do
     for j=0,19 do
       if level[1+j+i*20] == 2 then
-        love.graphics.draw(motan,j*32,i*32)
+        love.graphics.draw(tile,j*32,i*32)
+      elseif level[1+j+i*20] == 1 then
+        love.graphics.draw(spawn,j*32,i*32)
       end
     end
   end
@@ -187,11 +226,12 @@ function love.draw()
   end
 
   info:set({"         x: "..x..
-          "\n         y: "..y..
           "\n        vx: "..vx..
+          "\n         y: "..y..
           "\n        vy: "..vy..
           "\n    midair: "..tostring(midair)..
-          "\ndoublejump: "..tostring(doublejump)
+          "\ndoublejump: "..tostring(doublejump)..
+          "\n  collided: "..tostring(collided)
           ,{1,1,1}
            })
   love.graphics.draw(info,0,0)
@@ -213,6 +253,7 @@ function love.keypressed(key, unused, isrepeat)
       vy = jumppower
       doublejump = false
     end
+    midair = true
   end
   if key == "down" then
     downdraw = true
