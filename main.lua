@@ -44,6 +44,9 @@ local downdraw
 local updraw
 local rightdraw
 
+-- music
+local mtestroom
+
 -- level stuff
 local level = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -71,6 +74,10 @@ function love.load()  -- load assets
   downimg = love.graphics.newImage('graphics/down.png')
   upimg = love.graphics.newImage('graphics/up.png')
   rightimg = love.graphics.newImage('graphics/right.png')
+
+  mtestroom = love.audio.newSource('music/testroom.it', "static")
+  mtestroom:setLooping(true)
+  mtestroom:play()
 
   motanh = motan:getHeight()
   motanw = motan:getWidth()
@@ -130,9 +137,7 @@ function love.update(dt)
   x = x%xres
 
   if y >= 1000 then
-    x = sx
-    y = sy
-    print("respawned!")
+    respawn()
   end
   
   collided = false
@@ -146,7 +151,7 @@ function love.update(dt)
       tx2 = tx+32 -- tile right edge
 
       if level[1+j+i*20] >= 2 then
-        if x2 > tx and x <= tx2 and y2 > ty and y <= ty2 then
+        if x2 >= tx and x <= tx2 and y2 > ty and y < ty2 then
           collidedh = true
           if vx > 0 then  -- going right
             x = tx-32
@@ -259,6 +264,9 @@ function love.keypressed(key, unused, isrepeat)
     downdraw = true
     vy = pound
   end
+  if key == "r" then
+    respawn()
+  end
 end
 
 function love.keyreleased(key)
@@ -277,4 +285,12 @@ function love.keyreleased(key)
   if key == "down" then
     downdraw = false
   end
+end
+
+function respawn() 
+  vx = 0
+  vy = 0
+  x = sx
+  y = sy
+  print("respawned!")
 end
